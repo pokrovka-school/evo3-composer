@@ -25,7 +25,7 @@
 		"phpoffice/phpspreadsheet": ">=1.9",
 		"mpdf/mpdf": ">=7.0.0",
 		"ps/image-optimizer": ">=2.0",
-		"phpmailer/phpmailer": "latest",
+		"phpmailer/phpmailer": "dev-master",
 		"ralouphie/mimey": "^2.1"
 	},
 	"autoload": {
