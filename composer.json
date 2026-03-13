@@ -19,8 +19,7 @@
 		"phpoffice/phpspreadsheet": ">=1.9",
 		"mpdf/mpdf": ">=7.0.0",
 		"ps/image-optimizer": ">=2.0",
-		"phpmailer/phpmailer": "6.x",
-		"ralouphie/mimey": "^2.1.0"
+		"phpmailer/phpmailer": "6.x"
 	},
 	"autoload": {
 		"psr-4": {
