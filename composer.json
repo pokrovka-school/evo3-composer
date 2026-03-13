@@ -1,0 +1,36 @@
+{
+	"name": "projectsoft/pokrovka",
+	"description": "Composer для сайта ГБОУ ООШ с. Покровка",
+	"keywords": [],
+	"homepage": "https://github.com/pokrovka-school/evo3-composer",
+	"type": "library",
+	"minimum-stability": "dev",
+	"prefer-stable": true,
+	"license": "MIT",
+	"authors": [
+		{
+			"name": "ProjectSoft",
+			"email": "projectsoft2009@yandex.ru",
+			"homepage": "https://github.com/ProjectSoft-STUDIONIONS"
+		}
+	],
+	"repositories": [
+		{
+			"type": "vcs",
+			"url": "https://github.com/PHPMailer/PHPMailer"
+		}
+	],
+	"require": {
+		"php": ">=8.0",
+		"phpoffice/phpspreadsheet": ">=1.9",
+		"mpdf/mpdf": ">=7.0.0",
+		"ps/image-optimizer": ">=2.0",
+		"phpmailer/phpmailer": "dev-master",
+		"ralouphie/mimey": "^2.1"
+	},
+	"autoload": {
+		"psr-4": {
+			"ProjectSoft\\": "/src"
+		}
+	}
+}
