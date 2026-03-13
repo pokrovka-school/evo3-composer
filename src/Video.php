@@ -75,34 +75,39 @@ class Video {
 			$id = $match[1];
 			$link = "https://rutube.ru/api/video/" . $id . "/?format=json";
 			$str = $this->fetchPage($link);
-			$json = json_decode($str, true);
-			// <iframe width="720" height="405" src="https://rutube.ru/play/embed/748b8fd0491c7ba687e04d95ab1ea187" frameBorder="0" allow="clipboard-write" webkitAllowFullScreen mozallowfullscreen allowFullScreen></iframe>
-			if($json['track_id']){
-				$this->videoInfo['id'] = $json['track_id'];
-				$this->videoInfo['link'] = $this->link;
-				//$json['track_id']
-				$this->videoInfo['video'] = '<div class="embed"><div class="embed-responsive embed-responsive-16by9"><iframe src="https://rutube.ru/play/embed/' . $this->videoInfo['id'] . '" frameborder="0" allow="clipboard-write" loading="lazy" webkitAllowFullScreen mozallowfullscreen allowFullScreen></iframe></div></div>';
-				/** Скачать и сохранить если сохраняется документ */
-				@mkdir(MODX_BASE_PATH . $this->dir_images . $this->hosting . '/', 0755, true);
-				$img_file = $this->dir_images . $this->hosting . '/' . $json['track_id'] . '.jpg';
-				if($this->autosave){
-					@unlink(MODX_BASE_PATH . $img_file);
-					$img = $this->fetchPage($json['thumbnail_url']);
-					if($img){
-						@file_put_contents(MODX_BASE_PATH . $img_file, $img);
-						if(is_file(MODX_BASE_PATH . $img_file)){
-							$image = $this->modx->runSnippet('phpthumb', array(
-								'input' => $img_file,
-								'options' => 'w=680,h=360,zc=C'
-							));
-							@copy(MODX_BASE_PATH . $image, MODX_BASE_PATH . $img_file);
+			if($str) {
+				$json = json_decode($str, true);
+				// <iframe width="720" height="405" src="https://rutube.ru/play/embed/748b8fd0491c7ba687e04d95ab1ea187" frameBorder="0" allow="clipboard-write" webkitAllowFullScreen mozallowfullscreen allowFullScreen></iframe>
+				if($json['track_id']){
+					$this->videoInfo['id'] = $json['track_id'];
+					$this->videoInfo['link'] = $this->link;
+					//$json['track_id']
+					$this->videoInfo['video'] = '<div class="embed"><div class="embed-responsive embed-responsive-16by9"><iframe src="https://rutube.ru/play/embed/' . $this->videoInfo['id'] . '" frameborder="0" allow="clipboard-write" loading="lazy" webkitAllowFullScreen mozallowfullscreen allowFullScreen></iframe></div></div>';
+					$this->videoInfo['provider'] = "rutube";
+					/** Скачать и сохранить если сохраняется документ */
+					@mkdir(MODX_BASE_PATH . $this->dir_images . $this->hosting . '/', 0755, true);
+					$img_file = $this->dir_images . $this->hosting . '/' . $json['track_id'] . '.jpg';
+					if($this->autosave && !is_file(MODX_BASE_PATH . $img_file)){
+						@unlink(MODX_BASE_PATH . $img_file);
+						$img = $this->fetchPage($json['thumbnail_url']);
+						if($img){
+							@file_put_contents(MODX_BASE_PATH . $img_file, $img);
+							if(is_file(MODX_BASE_PATH . $img_file)){
+								$image = $this->modx->runSnippet('phpthumb', array(
+									'input' => $img_file,
+									'options' => 'w=680,h=360,zc=C'
+								));
+								@copy(MODX_BASE_PATH . $image, MODX_BASE_PATH . $img_file);
+							}
 						}
 					}
-				}
-				if(is_file(MODX_BASE_PATH . $img_file)){
-					$this->videoInfo['image'] = $img_file;
+					if(is_file(MODX_BASE_PATH . $img_file)){
+						$this->videoInfo['image'] = $img_file;
+					}else{
+						$this->videoInfo['image'] = $json['thumbnail_url'];
+					}
 				}else{
-					$this->videoInfo['image'] = $json['thumbnail_url'];
+					return array();
 				}
 			}else{
 				return array();
@@ -128,12 +133,12 @@ class Video {
 			}
 			$embed .= 'showinfo=0&modestbranding=1&rel=0';
 			$this->videoInfo['video'] = '<div class="embed"><div class="embed-responsive embed-responsive-16by9"><iframe src="' . $embed . '" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" loading="lazy" webkitAllowFullScreen mozallowfullscreen allowfullscreen></iframe></div></div>';
-
+			$this->videoInfo['provider'] = "youtube";
 			/** Скачать и сохранить если сохраняется документ */
 			$image = "https://img.youtube.com/vi/" . $match[0] . "/sddefault.jpg";
 			@mkdir(MODX_BASE_PATH . $this->dir_images . $this->hosting . '/', 0755, true);
 			$img_file = $this->dir_images . $this->hosting . '/' . $match[0] . '.jpg';
-			if($this->autosave){
+			if($this->autosave && !is_file(MODX_BASE_PATH . $img_file)){
 				$img = $this->fetchPage($image);
 				if($img){
 					@file_put_contents(MODX_BASE_PATH . $img_file, $img);
