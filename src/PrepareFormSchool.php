@@ -4,39 +4,39 @@ namespace ProjectSoft;
 
 class PrepareFormSchool {
 
-	public static function prepareProcess($modx, $data, $fl, $name)
+	public static function prepareProcess($modx, $data, $FormLister, $name)
 	{
-		$cfg = $fl->config->getConfig();
+		$cfg = $FormLister->config->getConfig();
 		$site = $modx->config['site_name'];
-		$fl->mailConfig['subject']  = $cfg["subject"] = "Робот сайта «" . $site . "»";
-		$fl->mailConfig['replyTo']  = $cfg["replyTo"] = $modx->config['email_bot'];
-		$fl->mailConfig['fromName']  = $cfg["fromName"] = $modx->config['email_bot_name'];
-		$fl->config->setConfig($cfg);
+		$FormLister->mailConfig['subject']  = $cfg["subject"] = "Робот сайта «" . $site . "»";
+		$FormLister->mailConfig['replyTo']  = $cfg["replyTo"] = $modx->config['email_bot'];
+		$FormLister->mailConfig['fromName']  = $cfg["fromName"] = $modx->config['email_bot_name'];
+		$FormLister->config->setConfig($cfg);
 	}
 
-	public static function prepare($modx, $data, $fl, $name)
+	public static function prepare($modx, $data, $FormLister, $name)
 	{
-		$https_port = 443;
+		//$csrf = "";
+		// Для Evolution CMS 3.x.x
+		//if(function_exists('csrf_field')):
+		//	$csrf = csrf_field();
+		//endif;
 		$id = $modx->documentIdentifier;
-		$url = $modx->makeUrl($id, '', '');
+		$url = $modx->makeUrl($id, '', '', 'full');
 		$charset = $modx->config['modx_charset'];
-		$secured = (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https');
-		$port = ((isset ($_SERVER['HTTPS']) && ( (strtolower($_SERVER['HTTPS']) == 'on') || ($_SERVER['HTTPS']) == '1')) || $_SERVER['SERVER_PORT'] == $https_port || $secured) ? 'https://' : 'http://';
-		$input = $_SERVER['HTTP_HOST'];
-		$idna = new idna_convert();
-		$host = $port . $idna->decode($input) . $url;
-		$message = $fl->getField('message');
+		$message = $FormLister->getField('message');
 		$message = $message ? htmlspecialchars(trim(strip_tags($message)), ENT_COMPAT, $charset, true) : '';
-		$fl->setField('message', $message);
-		$fl->setField("pagetitle", $modx->documentObject["pagetitle"]);
-		$fl->setField("url", $host);
+		$FormLister->setField('message', $message);
+		$FormLister->setField("pagetitle", $modx->documentObject["pagetitle"]);
+		$FormLister->setField("url", $url);
+		//$FormLister->setField('_token', $csrf);
 	}
 
-	public static function prepareAfterProcess($modx, $data, $fl, $name)
+	public static function prepareAfterProcess($modx, $data, $FormLister, $name)
 	{
-		$theme = $fl->getField("formid");
+		$theme = $FormLister->getField("formid");
 		$theme_val = "Вопрос с сайта " . $modx->config['site_name'];
-		$message = $fl->getField('message');
+		$message = $FormLister->getField('message');
 		$message = $message ? $message : '';
 		$re = '/^(.*\:|(?:.*))(.*)/m';
 		$subst = '*$1* $2';
@@ -44,16 +44,16 @@ class PrepareFormSchool {
 		$subst = "\\\\.";
 		//$message = preg_replace($re, $subst, $message);
 
-		$page = '' . $modx->documentObject["pagetitle"] . " _" . $fl->getField('url') . "_";
+		$page = '' . $modx->documentObject["pagetitle"] . " _" . $FormLister->getField('url') . "_";
 		//$page = preg_replace($re, $subst, $page);
 
-		$first_name = $fl->getField('first_name');
+		$first_name = $FormLister->getField('first_name');
 		//$first_name = preg_replace($re, $subst, $first_name);
 
-		$email = $fl->getField('email');
+		$email = $FormLister->getField('email');
 		//$email = preg_replace($re, $subst, $email);
 
-		$phone = $fl->getField('phone');
+		$phone = $FormLister->getField('phone');
 		//$phone = preg_replace($re, $subst, $phone);
 
 		$date = date('d.m.Y H:i:s', time() + $modx->config['server_offset_time']);
@@ -82,22 +82,21 @@ class PrepareFormSchool {
 			"tlg_token"		=> $modx->config["tlg_token"],
 			"chat_id"		=> $modx->config["tlg_chanel"]
 		);
-		//file_put_contents('formsend.txt', print_r($arr, true));
-		//$modx->invokeEvent('onSendBot', $arr);
+		/**
 		$bot = new \ProjectSoft\SendBot($arr);
 		$result = $bot->send();
-		file_put_contents(dirname(__FILE__) . '/0001-result.txt', print_r($result, true));
 		$json = json_decode($result);
 		if(is_object($json)):
 			if(!$json->ok):
-				$fl->setFormStatus(false);
-				$fl->addMessage($json->description);
-				//$fl->setFormStatus(false);
+				$FormLister->setFormStatus(false);
+				$FormLister->addMessage($json->description);
+				//$FormLister->setFormStatus(false);
 			endif;
 		else:
-			$fl->setFormStatus(false);
-			$fl->addMessage($result);
-			//$fl->setFormStatus(false);
+			$FormLister->setFormStatus(false);
+			$FormLister->addMessage($result);
+			//$FormLister->setFormStatus(false);
 		endif;
+		*/
 	}
 }

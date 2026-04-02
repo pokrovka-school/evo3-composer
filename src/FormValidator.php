@@ -11,7 +11,6 @@ class FormValidator {
 		}
 		$idn = new \ProjectSoft\idna_convert(array('idn_version'=>2008));
 		$email = $idn->encode($value);
-		file_put_contents('email_valid.txt', print_r((preg_match("/^([\w-._]+@[\w-._]+\.[\w-]{2,})$/i", $email)), true));
 		return (preg_match("/^([\w._-]+@[\w._-]+\.[\w-]{2,})$/i", $email));
 	}
 	
