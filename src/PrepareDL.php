@@ -3,6 +3,25 @@ namespace ProjectSoft;
 
 class PrepareDL {
 
+	public static function prepareItemRSS(array $data, \DocumentParser $modx, $_DL, \prepare_DL_Extender $_extDocLister)
+	{
+		$value1 = isset($data["meta_image"]) ? $data["meta_image"] : "";
+		$image = $modx->runSnippet('phpthumb', array(
+			'input' => $value1,
+			'options' => 'f=jpeg,w=768,h=432,zc=C'
+		));
+		$data["meta_image"] = $modx->config["site_url"] . $image;
+		// Description
+		$value2 = isset($data["introtext"]) ? $data["introtext"] : '';
+		$value2 = preg_replace('@<style.*?>.*?</style>@is', '', $value2);
+		$value2 = preg_replace('@<script.*?>.*?</script>@is', '', $value2);
+		$value2 = preg_replace('/[\r\n]+(?:\s+)?/', "<br>", strip_tags($value2));
+		$value2 = $modx->htmlspecialchars(stripslashes( $value2 ));
+		$data["introtext"] = "<![CDATA[" . $value2 . "]]>";
+		// Return
+		return $data;
+	}
+
 	public static function prepareItem(array $data, \DocumentParser $modx, $_DL, \prepare_DL_Extender $_extDocLister)
 	{
 		$month = array(
@@ -45,8 +64,15 @@ class PrepareDL {
 			$data['seo_date'] = date('c', $date);
 		endif;
 		$data['alt'] = Util::hsc($modx, $data['pagetitle']);
-		//$data['introtext'] = nl2br($data['introtext']);
-		//$data['imgSoc']
+		$data['meta_image'] = $modx->runSnippet('phpthumb', array(
+			'input' => $data['meta_image'],
+			'options' => 'w=751,h=422,f=jpeg,zc=C'
+		));
+		$longtitle = trim($data['longtitle']);
+		if(!empty($longtitle)):
+			$data['title'] = $longtitle;
+		endif;
+		$data['introtext'] = preg_replace('/[\r\n]+(?:\s+)?/', "<br>", strip_tags($data['introtext']));
 		return $data;
 	}
 

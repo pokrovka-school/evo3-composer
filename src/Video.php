@@ -23,6 +23,7 @@ class Video {
 
 	const YOUTUBE = 'youtube';
 	const RUTUBE  = 'rutube';
+	const VK      = 'vkvideo';
 	const DEF     = 'default';
 
 	/**
@@ -30,20 +31,39 @@ class Video {
 	 */
 	public function __construct(string $link = null, bool $autosave = false, array &$videoInfo = array())
 	{
-		$this->modx = EvolutionCMS();
+		$this->modx = evo();
 		$this->autosave = $autosave ? true : false;
 		if(!is_null($link) || !empty($link)):
 			$videoInfo = $this->setLink($link);
 		endif;
 	}
 
+	public function setLink(string $link = null)
+	{
+		$this->videoInfo = array();
+		if(!empty($link)):
+			$this->videoInfo = $this->cleanLink($link)->getVideoInfo();
+		endif;
+		return $this->videoInfo;
+	}
+
+	private function log($data, $line=__LINE__)
+	{
+		file_put_contents(dirname(__FILE__) . '/videoInfo.txt', $line . PHP_EOL . print_r($data, true) . PHP_EOL, FILE_APPEND);
+	}
+
+	private function errorFn($data, $line=__LINE__)
+	{
+		$this->videoInfo["error"][] = trim(print_r($data, true)) . PHP_EOL . "(" . $line . ")" . PHP_EOL . PHP_EOL;
+	}
 
 	/** Проверка и подготовка ссылки и частей */
 	private function cleanLink($link)
 	{
 		if (!preg_match('/^(http|https)\:\/\//i', $link)):
-			$this->link = 'https://' . $link;
+			$this->link = $link;
 		else:
+			// Забираем видео только по https !!!
 			$this->link = preg_replace('/^(?:https?):\/\//i', 'https://', $link, 1);
 		endif;
 		return $this;
@@ -52,25 +72,94 @@ class Video {
 	/** Определяем хостинг и получаем информацию о видео */
 	private function getVideoInfo()
 	{
-		$re_youtube = '/^(?:https?\:\/\/(?:[w]{3}\.)?)(youtu(?:\.be|be\.com))\//i';
-		$re_rutube  = '/^(?:https?\:\/\/(?:[w]{3}\.)?)(rutube\.ru)/i';
-		if(preg_match($re_youtube, $this->link)):
-			// Получаем YouTube
-			$this->hosting = self::YOUTUBE;
-			return $this->getYouTubeInfo();
-		elseif(preg_match($re_rutube, $this->link)):
-			// Получаем RuTube
-			$this->hosting = self::RUTUBE;
-			return $this->getRuTubeInfo();
-		endif;/** ..... */
-		$this->hosting = self::DEF;
-		return array();
+		//$re_youtube = '/^(?:https?\:\/\/(?:[w]{3}\.)?)(youtu(?:\.be|be\.com))\//i';
+		//$re_rutube  = '/^(?:https?\:\/\/(?:[w]{3}\.)?)(rutube\.ru)/i';
+		$re = $re = '/^(?:https?:\/\/)?(?:[w]{3}\.)?([^\/]+)/i';
+		preg_match($re, $this->link, $matches);
+		//$this->log($matches, __LINE__);
+		if(count($matches)):
+			$host = mb_strtolower($matches[1]);
+			switch($host) {
+				// YouTube
+				case 'youtu.be':
+				case 'youtube.com':
+					$this->hosting = self::YOUTUBE;
+					return $this->getYouTubeInfo();
+					break;
+				// Rutube
+				case 'rutube.ru':
+					$this->hosting = self::RUTUBE;
+					return $this->getRuTubeInfo();
+					break;
+				case 'vk.com':
+				case 'vk.ru':
+				case 'vkvideo.com':
+				case 'vkvideo.ru':
+					$this->hosting = self::VK;
+					return $this->getVkInfo();
+					break;
+				default:
+					if (filter_var($this->link, FILTER_VALIDATE_URL)):
+						$url_info = parse_url($this->link);
+						$this->hosting = $url_info['host'];
+						return $this->getVideoLinkInfo();
+					else:
+						// Локальная ссылка
+						$this->hosting = self::DEF;
+						return $this->getDefaultInfo();
+					endif;
+					$this->errorFn('Error url: ' . $this->link, __LINE__);
+					return $this->videoInfo;
+					break;
+			}
+		else:
+			// Если на сервере - вернуть getDefaultInfo
+			return $this->getDefaultInfo();
+		endif;
+	}
+
+	/** Получение информации с VK */
+	private function getVkInfo() {
+		/**
+		 * videoInfo
+		 *
+		 * array(
+		 * 	'id' => '',
+		 * 	'link' => '',
+		 * 	'player' => '',
+		 * 	'video' => '',
+		 * 	'provider' => '',
+		 * 	'image' => ''
+		 * )
+		 *
+		 */
+		$this->videoInfo = array();
+		$re = '/video(-?\d+_\d+)/i';
+		preg_match($re, $this->link, $match);
+		if(count($match)):
+			$id = (string)$match[1];
+			$ids = explode("_", $match[1]);
+			$player = 'https://vkvideo.ru/video_ext.php?oid=' . $ids[0] . '&id=' . $ids[1] . '&js_api=1&hd=4&loop=0&t=00h00m00s';
+			$this->videoInfo['id'] = $id;
+			$this->videoInfo['link'] = $this->link;
+			$this->videoInfo['player'] = $player;
+			$this->videoInfo['video'] = '<div class="embed"><div class="embed-responsive embed-responsive-16by9"><iframe src="' . $player . '" frameborder="0" allow="clipboard-write" loading="lazy" webkitAllowFullScreen mozallowfullscreen allowFullScreen></iframe></div></div>';
+			$this->videoInfo['provider'] = $this->hosting;
+			$this->videoInfo['type'] = 'iframe';
+			$img_file = $this->dir_images . $this->hosting . '/' . $id . '.jpg';
+			if(!is_dir(MODX_BASE_PATH . $this->dir_images . $this->hosting)):
+				@mkdir(MODX_BASE_PATH . $this->dir_images . $this->hosting . '/', 0755, true);
+			endif;
+			$this->videoInfo['image'] = $img_file;
+		else:
+			$this->errorFn('Error url: ' . $this->link, __LINE__);
+		endif;
+		return $this->videoInfo;
 	}
 
 	/** Получение информации с RuTube */
 	private function getRuTubeInfo()
 	{
-		$evo = evo();
 		/**
 		 * videoInfo
 		 *
@@ -91,33 +180,26 @@ class Video {
 			$id = $match[1];
 			$query = http_build_query(array(
 				"no_404" => "true",
-				"referer" => $evo->config["site_url"],
+				"referer" => $this->modx->config["site_url"],
 				"client" => "wdp",
 				"mq" => "all"
 			));
 			$link = "https://rutube.ru/api/play/options/" . $id . "/?" . $query;
 			$img_file = $this->dir_images . $this->hosting . '/' . $id . '.jpg';
 
-			if(is_file(MODX_BASE_PATH . $img_file)):
-				// Если изображение существует. Не делаем лишний запрос.
-				$this->videoInfo['id'] = $id;
-				$this->videoInfo['link'] = $this->link;
-				$this->videoInfo['player'] = 'https://rutube.ru/play/embed/' . $id;
-				$this->videoInfo['video'] = '<div class="embed"><div class="embed-responsive embed-responsive-16by9"><iframe src="' . $this->videoInfo['player'] . '" frameborder="0" allow="clipboard-write" loading="lazy" webkitAllowFullScreen mozallowfullscreen allowFullScreen></iframe></div></div>';
-				$this->videoInfo['provider'] = $this->hosting;
-				$this->videoInfo['image'] = $img_file;
-			else:
+			$this->videoInfo['id'] = $id;
+			$this->videoInfo['link'] = $this->link;
+			$this->videoInfo['player'] = 'https://rutube.ru/play/embed/' . $id;
+			$this->videoInfo['video'] = '<div class="embed"><div class="embed-responsive embed-responsive-16by9"><iframe src="' . $this->videoInfo['player'] . '" frameborder="0" allow="clipboard-write" loading="lazy" webkitAllowFullScreen mozallowfullscreen allowFullScreen></iframe></div></div>';
+			$this->videoInfo['provider'] = $this->hosting;
+			$this->videoInfo['type'] = 'iframe';
+			$this->videoInfo['image'] = $img_file;
+			if(!is_file(MODX_BASE_PATH . $img_file)):
 				// Если изображения нет, то делаем запрос за данными
 				$str = $this->fetchPage($link);
 				if($str):
 					$json = json_decode($str, true);
-					// <iframe width="720" height="405" src="https://rutube.ru/play/embed/748b8fd0491c7ba687e04d95ab1ea187" frameBorder="0" allow="clipboard-write" webkitAllowFullScreen mozallowfullscreen allowFullScreen></iframe>
 					if($json['video_id']):
-						$this->videoInfo['id'] = $json['video_id'];//$json['track_id'];
-						$this->videoInfo['link'] = $json['video_url'];
-						$this->videoInfo['player'] = 'https://rutube.ru/play/embed/' . $this->videoInfo['id'];
-						$this->videoInfo['video'] = '<div class="embed"><div class="embed-responsive embed-responsive-16by9"><iframe src="' . $this->videoInfo['player'] . '" frameborder="0" allow="clipboard-write" loading="lazy" webkitAllowFullScreen mozallowfullscreen allowFullScreen></iframe></div></div>';
-						$this->videoInfo['provider'] = $this->hosting;
 						/** Скачать и сохранить если сохраняется документ */
 						@mkdir(MODX_BASE_PATH . $this->dir_images . $this->hosting . '/', 0755, true);
 						$img_file = $this->dir_images . $this->hosting . '/' . $id . '.jpg';
@@ -139,14 +221,14 @@ class Video {
 							$this->videoInfo['image'] = $json['thumbnail_url'];
 						endif;
 					else:
-						return array();
+						$this->errorFn('Error url: ' . $this->link, __LINE__);
 					endif;
 				else:
-					return array();
+					$this->errorFn('Error url: ' . $this->link, __LINE__);
 				endif;
 			endif;
 		else:
-			return array();
+			$this->errorFn('Error url: ' . $this->link, __LINE__);
 		endif;
 		return $this->videoInfo;
 	}
@@ -163,7 +245,8 @@ class Video {
 		 * 	'player' => '',
 		 * 	'video' => '',
 		 * 	'provider' => '',
-		 * 	'image' => ''
+		 * 	'image' => '',
+		 *  'type' => ''
 		 * )
 		 *
 		 */
@@ -181,10 +264,12 @@ class Video {
 			$this->videoInfo['player'] = $embed;
 			$this->videoInfo['video'] = '<div class="embed"><div class="embed-responsive embed-responsive-16by9"><iframe src="' . $embed . '" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" loading="lazy" webkitAllowFullScreen mozallowfullscreen allowfullscreen></iframe></div></div>';
 			$this->videoInfo['provider'] = $this->hosting;
+			$this->videoInfo['type'] = 'iframe';
 			/** Скачать и сохранить если сохраняется документ */
 			$image = "https://img.youtube.com/vi/" . $match[0] . "/sddefault.jpg";
 			@mkdir(MODX_BASE_PATH . $this->dir_images . $this->hosting . '/', 0755, true);
 			$img_file = $this->dir_images . $this->hosting . '/' . $match[0] . '.jpg';
+			$this->videoInfo['image'] = $img_file;
 			if($this->autosave && !is_file(MODX_BASE_PATH . $img_file)):
 				$img = $this->fetchPage($image);
 				if($img):
@@ -195,7 +280,6 @@ class Video {
 							'options' => 'w=680,h=360,zc=C'
 						));
 						@copy(MODX_BASE_PATH . $image, MODX_BASE_PATH . $img_file);
-						$this->videoInfo['image'] = $img_file;
 					endif;
 				endif;
 			endif;
@@ -203,8 +287,51 @@ class Video {
 				$this->videoInfo['image'] = $image;
 			endif;
 		else:
-			return array();
+			$this->errorFn('Error url: ' . $this->link, __LINE__);
 		endif;
+		return $this->videoInfo;
+	}
+
+	// Видео на сервере сайта
+	private function getDefaultInfo()
+	{
+		$file_info = pathinfo($this->link);
+		$this->videoInfo['id'] = $file_info['filename'];
+		$this->videoInfo['link'] = $this->modx->config["site_url"] . $this->link;
+		$this->videoInfo['player'] = $this->modx->config["site_url"] . $this->link;
+		$path = $this->dir_images . $file_info['dirname'] . '/';
+		if(!is_dir(MODX_BASE_PATH . $path)):
+			@mkdir(MODX_BASE_PATH . $path. '/', 0755, true);
+		endif;
+		$image = $path . $file_info['filename'] . '.jpg';
+		$this->videoInfo['video'] = '<div class="embed"><div class="embed-responsive embed-responsive-16by9"><video src="/' . $this->link . '" crossorigin="anonymous" preload="none" poster="/' . $image . '" controls></video></div></div>';
+		$this->videoInfo['provider'] = $this->hosting;
+		$this->videoInfo['image'] = $image;
+		$this->videoInfo['type'] = 'video';
+		return $this->videoInfo;
+	}
+
+	/**
+	 * Видео на другом сайте
+	 * Именно на файл видео
+	 */
+	private function getVideoLinkInfo()
+	{
+		$url_info = parse_url($this->link);
+		$pathinfo = pathinfo($url_info['host'] . $url_info['path']);
+		$path = $pathinfo['dirname'];
+		$file_name = mb_strtolower($pathinfo['filename']) . '.jpg';
+		$this->videoInfo['id'] = $pathinfo['filename'];
+		$this->videoInfo['link'] = $this->link;
+		$this->videoInfo['player'] = $this->link;
+		$img_path = $this->dir_images . $path;
+		if(!is_dir(MODX_BASE_PATH . $img_path)):
+			@mkdir(MODX_BASE_PATH . $img_path . '/', 0755, true);
+		endif;
+		$this->videoInfo['image'] = $img_path . '/' . $file_name;
+		$this->videoInfo['video'] = '<div class="embed"><div class="embed-responsive embed-responsive-16by9"><video src="' . $this->link . '" crossorigin="anonymous" preload="none" poster="' . $img_path . '/' . $file_name . '" controls></video></div></div>';
+		$this->videoInfo['provider'] = $url_info['host'];
+		$this->videoInfo['type'] = 'video';
 		return $this->videoInfo;
 	}
 
@@ -214,6 +341,7 @@ class Video {
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, $url);
 		curl_setopt($ch, CURLOPT_FAILONERROR, true);
+		curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 		curl_setopt($ch, CURLOPT_TIMEOUT, 5);
@@ -223,14 +351,5 @@ class Video {
 			return false;
 		endif;
 		return $result;
-	}
-	
-	public function setLink(string $link = null)
-	{
-		$videoInfo = array();
-		if(!empty($link)):
-			$videoInfo = $this->cleanLink($link)->getVideoInfo();
-		endif;
-		return $videoInfo;
 	}
 }
